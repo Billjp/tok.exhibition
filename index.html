@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TOK Exhibition 考察支援ツール</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --panel: #ffffff;
+    --ink: #2b2b2b;
+    --sub: #6b6b6b;
+    --line: #e3e0d8;
+    --accent: #4a5d52;       /* muted academic green */
+    --accent-soft: #e7ede9;
+    --accent2: #8a6d3b;      /* muted gold */
+    --accent3: #3e5c6e;      /* muted blue */
+    --warn-bg: #fdf3e7;
+    --warn-ink: #8a5a17;
+    --warn-line: #ecc89a;
+    --ok: #4a7a5a;
+    --bar-bg: #ece9e1;
+    --shadow: 0 1px 3px rgba(0,0,0,.06), 0 6px 24px rgba(0,0,0,.04);
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic",
+      "Segoe UI", Roboto, sans-serif;
+    line-height: 1.7; font-size: 15px; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  header.app-head { margin-bottom: 22px; }
+  .app-head .kicker {
+    font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--accent2); font-weight: 600; margin-bottom: 6px;
+  }
+  .app-head h1 { font-size: 26px; margin: 0 0 6px; font-weight: 700; letter-spacing: .01em; }
+  .app-head p { margin: 0; color: var(--sub); font-size: 14px; }
+
+  .basic-q {
+    background: linear-gradient(180deg, #eef3f0, #e7ede9);
+    border: 1px solid #d3ddd6; border-left: 4px solid var(--accent);
+    border-radius: 10px; padding: 13px 18px; margin: 14px 0 26px;
+  }
+  .basic-q .lab { font-size: 11px; letter-spacing: .12em; color: var(--accent2); font-weight: 700; text-transform: uppercase; }
+  .basic-q .q { font-size: 15px; font-weight: 600; color: #2f3d35; margin-top: 2px; }
+  .basic-q .src { font-size: 11.5px; color: var(--sub); margin-top: 3px; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 24px 26px; margin-bottom: 22px;
+  }
+  .card h2 { font-size: 16px; margin: 0 0 4px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
+  .card h2 .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: 12px; font-weight: 700;
+  }
+  .card .hint { color: var(--sub); font-size: 13px; margin: 0 0 16px; }
+
+  label.field-label { display: block; font-size: 13px; font-weight: 600; margin: 0 0 6px; color: #3a3a3a; }
+  .field-sub { font-size: 12px; color: var(--sub); font-weight: 400; }
+
+  select, input[type=text], textarea, input[type=number] {
+    width: 100%; padding: 10px 12px; font-size: 14px; font-family: inherit;
+    border: 1px solid var(--line); border-radius: 9px; background: #fcfbf8; color: var(--ink);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  select:focus, input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  textarea { resize: vertical; min-height: 88px; }
+
+  .prompt-box { margin-top: 14px; padding: 14px 16px; border-radius: 10px; background: var(--accent-soft); border: 1px solid #d3ddd6; }
+  .prompt-box .en { font-weight: 600; }
+  .prompt-box .ja { color: var(--accent); font-size: 13.5px; margin-top: 3px; }
+  .prompt-box.empty { background: #f3f2ee; border-color: var(--line); color: var(--sub); }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tab {
+    flex: 1 1 0; min-width: 120px; padding: 11px 10px; text-align: center;
+    border: 1px solid var(--line); border-radius: 10px; background: #fbfaf6;
+    cursor: pointer; font-weight: 600; font-size: 14px; color: var(--sub); transition: all .15s;
+  }
+  .tab:hover { border-color: #cfcabb; }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .tab .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #cbcbcb; margin-left: 6px; vertical-align: middle; }
+  .tab .dot.filled { background: var(--accent2); }
+  .tab.active .dot { background: #cfe3d6; }
+  .tab.active .dot.filled { background: #f0d9a8; }
+
+  .obj-panel { display: none; }
+  .obj-panel.active { display: block; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 760px){ .grid2 { grid-template-columns: 1fr; } }
+  .field { margin-bottom: 18px; }
+
+  .img-drop {
+    border: 1.5px dashed #cfcabb; border-radius: 10px; background: #fbfaf6;
+    aspect-ratio: 4/3; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; color: var(--sub); cursor: pointer;
+    overflow: hidden; position: relative; transition: border-color .15s, background .15s;
+  }
+  .img-drop:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .img-drop img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .img-drop .ph-icon { font-size: 30px; opacity: .5; }
+  .img-drop .ph-text { font-size: 12px; margin-top: 4px; }
+  .img-actions { margin-top: 8px; display: flex; gap: 10px; }
+  .link-btn { background: none; border: none; color: var(--accent); font-size: 12px; cursor: pointer; padding: 0; text-decoration: underline; font-family: inherit; }
+  .link-btn.danger { color: #a14a3a; }
+
+  .slider-row { margin-bottom: 20px; }
+  .slider-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .slider-head .name { font-weight: 600; font-size: 13.5px; }
+  .slider-head .val { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 15px; color: var(--accent); min-width: 28px; text-align: right; }
+  .slider-desc { font-size: 12px; color: var(--sub); margin: 0 0 9px; }
+  input[type=range]{ -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 6px; background: var(--bar-bg); outline: none; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); cursor: pointer; }
+  input[type=range]::-moz-range-thumb{ width: 20px; height: 20px; border-radius: 50%; background: var(--accent); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); cursor: pointer; }
+  .scale-marks { display: flex; justify-content: space-between; font-size: 10.5px; color: #a3a3a3; margin-top: 3px; }
+
+  .viz-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; margin-top: 8px; }
+  @media (max-width: 760px){ .viz-wrap { grid-template-columns: 1fr; } }
+  .bars .bar-block { margin-bottom: 14px; }
+  .bars .bar-label { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px; }
+  .bars .bar-label b { font-weight: 600; }
+  .bar-track { height: 9px; background: var(--bar-bg); border-radius: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; transition: width .35s ease, background .3s; }
+
+  .suggest { margin-top: 6px; padding: 13px 15px; border-radius: 10px; background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-ink); font-size: 13px; display: none; }
+  .suggest.show { display: block; }
+  .suggest .s-title { font-weight: 700; margin-bottom: 4px; }
+  .suggest ul { margin: 6px 0 0; padding-left: 18px; }
+  .suggest li { margin-bottom: 3px; }
+  .suggest.good { background: #eef4ef; border-color: #cfe0d4; color: var(--ok); }
+
+  /* per-observation-point: slider + memo side by side */
+  .eval-section { margin-top: 22px; padding-top: 18px; border-top: 1px dashed var(--line); }
+  .memo-title { font-size: 14px; font-weight: 700; color: var(--accent); }
+  .memo-sub { font-size: 12px; color: var(--sub); margin: 3px 0 16px; }
+  .eval-row { margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid #f0eee7; }
+  .eval-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .eval-headline { font-weight: 700; font-size: 13.5px; color: var(--accent); margin-bottom: 10px; }
+  .eval-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
+  @media (max-width: 600px){ .eval-cols { grid-template-columns: 1fr; gap: 14px; } }
+  .eval-slider .slider-head { margin-bottom: 4px; }
+  .eval-memo textarea { min-height: 96px; line-height: 1.6; }
+  .eval-memo textarea::placeholder { color: #b7b3a8; }
+
+  .ol-para .ol-hint { font-size: 11.5px; color: var(--sub); margin: 4px 0 0; padding-left: 4px; }
+  .ol-para .ol-warn { font-size: 11.5px; color: var(--warn-ink); margin: 3px 0 0; padding-left: 4px; }
+  .ol-para li.empty { color: #b06a4a; font-style: italic; list-style: none; margin-left: -10px; }
+
+  /* band estimate */
+  .band {
+    display: flex; align-items: center; gap: 16px; padding: 16px 18px; border-radius: 12px;
+    border: 1px solid var(--line); background: #fcfbf8; margin-top: 8px;
+  }
+  .band .score { font-size: 30px; font-weight: 800; line-height: 1; min-width: 70px; text-align: center; }
+  .band .score small { display: block; font-size: 11px; font-weight: 600; color: var(--sub); margin-top: 4px; }
+  .band .meta .lvl { font-size: 15px; font-weight: 700; }
+  .band .meta .kw { font-size: 12.5px; color: var(--sub); margin-top: 2px; }
+  .band .meta .note2 { font-size: 11.5px; color: var(--sub); margin-top: 5px; font-style: italic; }
+
+  .cap-warn {
+    margin-top: 12px; padding: 11px 14px; border-radius: 10px; font-size: 12.5px;
+    background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-ink); display: none;
+  }
+  .cap-warn.show { display: block; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px;
+    background: var(--accent); color: #fff; border: none; border-radius: 10px;
+    font-size: 14.5px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s, transform .05s;
+  }
+  .btn:hover { background: #3d4e44; }
+  .btn:active { transform: translateY(1px); }
+  .btn.secondary { background: #fff; color: var(--accent); border: 1px solid var(--line); }
+  .btn.secondary:hover { background: var(--accent-soft); }
+  .btn-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+  .wordcfg { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--sub); flex-wrap: wrap; }
+  .wordcfg input[type=number] { width: 78px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: none; background: #fff; padding: 7px 14px; font-size: 13px; cursor: pointer; font-family: inherit; color: var(--sub); }
+  .seg button.on { background: var(--accent); color: #fff; }
+
+  .outline { margin-top: 22px; display: none; }
+  .outline.show { display: block; }
+  .ol-obj { border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; background: #fcfbf8; }
+  .ol-obj h3 { margin: 0 0 2px; font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ol-obj .ol-meta { font-size: 12px; color: var(--sub); margin-bottom: 12px; }
+  .ol-para { margin-bottom: 13px; }
+  .ol-para .ph { font-weight: 700; font-size: 13px; color: var(--accent2); margin-bottom: 3px; }
+  .ol-para ul { margin: 0; padding-left: 18px; }
+  .ol-para li { font-size: 13.5px; margin-bottom: 4px; color: #3a3a3a; }
+  .ol-para li .blank { color: #b06a4a; font-style: italic; }
+  .badge { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 20px; background: var(--accent-soft); color: var(--accent); }
+  .badge.low { background: var(--warn-bg); color: var(--warn-ink); }
+
+  .note { font-size: 12px; color: var(--sub); background: #f3f2ee; border: 1px solid var(--line); border-radius: 9px; padding: 10px 13px; margin-top: 10px; }
+  .note b { color: var(--warn-ink); }
+  .req-list { font-size: 13px; color: #3a3a3a; margin: 0; padding-left: 20px; }
+  .req-list li { margin-bottom: 5px; }
+  .req-list b { color: var(--accent); }
+  details.req { margin-bottom: 22px; }
+  details.req summary { cursor: pointer; font-weight: 700; font-size: 14px; color: var(--accent); padding: 4px 0; }
+  details.req[open] summary { margin-bottom: 10px; }
+
+  .foot { text-align: center; color: #b3b0a8; font-size: 12px; margin-top: 30px; }
+  .save-state { font-size: 12px; color: var(--ok); opacity: 0; transition: opacity .3s; }
+  .save-state.show { opacity: 1; }
+
+  /* ---------- print report ---------- */
+  #printReport { display: none; }
+  #printReport .pr-head { border-bottom: 2px solid var(--accent); padding-bottom: 8px; margin-bottom: 14px; }
+  #printReport .pr-head h1 { font-size: 20px; margin: 0 0 2px; }
+  #printReport .pr-head .pr-sub { font-size: 11px; color: #666; }
+  #printReport .pr-prompt { background: #f1f5f2; border: 1px solid #d3ddd6; border-radius: 8px; padding: 10px 13px; margin-bottom: 12px; }
+  #printReport .pr-prompt .ja { font-weight: 700; font-size: 14px; }
+  #printReport .pr-prompt .en { font-size: 11.5px; color: #555; margin-top: 2px; }
+  #printReport .pr-meta { font-size: 11px; color: #555; margin-bottom: 14px; }
+  #printReport .pr-band { font-size: 12px; margin-bottom: 6px; }
+  #printReport .pr-band b { color: var(--accent); }
+  #printReport .pr-radar { text-align: center; margin: 6px 0 16px; }
+  #printReport .pr-radar img { max-width: 340px; width: 100%; }
+  #printReport .pr-obj { border: 1px solid #d9d6cd; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; page-break-inside: avoid; break-inside: avoid; }
+  #printReport .pr-obj h2 { font-size: 14px; margin: 0 0 3px; }
+  #printReport .pr-obj .pr-score { font-size: 11px; color: #555; margin-bottom: 8px; }
+  #printReport .pr-obj-grid { display: flex; gap: 12px; }
+  #printReport .pr-obj-grid .pr-img { width: 150px; flex: 0 0 150px; }
+  #printReport .pr-obj-grid .pr-img img { width: 100%; border-radius: 6px; border: 1px solid #ddd; }
+  #printReport .pr-obj-grid .pr-img .noimg { width: 100%; height: 110px; border: 1px dashed #ccc; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 11px; }
+  #printReport .pr-ctx { font-size: 11.5px; color: #444; margin: 0 0 8px; }
+  #printReport .pr-ctx .lbl { font-weight: 700; color: #333; }
+  #printReport .pr-para { margin-bottom: 7px; }
+  #printReport .pr-para .ph { font-weight: 700; font-size: 11.5px; color: var(--accent2); }
+  #printReport .pr-para ul { margin: 2px 0 0; padding-left: 16px; }
+  #printReport .pr-para li { font-size: 11px; margin-bottom: 2px; }
+  #printReport .pr-foot { font-size: 10px; color: #888; margin-top: 14px; border-top: 1px solid #ddd; padding-top: 6px; }
+
+  @media print {
+    body { background: #fff; }
+    .wrap { max-width: none; padding: 0; }
+    .wrap > *:not(#printReport) { display: none !important; }
+    #printReport { display: block !important; }
+    @page { margin: 14mm; size: A4; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="app-head">
+    <div class="kicker">IBDP · Theory of Knowledge</div>
+    <h1>TOK Exhibition 考察支援ツール</h1>
+    <p>IAプロンプトと3つの事物の論理的なつながりを可視化し、コメンタリーの構成を組み立てます。</p>
+    <div class="basic-q">
+      <div class="lab">評価の基本の質問</div>
+      <div class="q">この展示は、私たちを取り巻く世界にTOKがどのように顕在しているかを示すことに成功しているか。</div>
+      <div class="src">出典：IB『「知の理論」（TOK）指導の手引き』2022年第1回試験 — TOK展示の評価方法</div>
+    </div>
+  </header>
+
+  <details class="req card" style="padding:18px 22px;">
+    <summary>展示の必須要素と公式ルール（クリックで開く）</summary>
+    <ul class="req-list">
+      <li><b>タイトル</b>：選択したIAプロンプトを明確に示す。</li>
+      <li><b>3つの事物の画像</b>：物理的でもデジタルでも可。ただし<b>特定の時間と場所に存在する具体的な実社会の文脈</b>を伴うこと（一般的なネット画像は不可）。画像は<b>出典を明記</b>。</li>
+      <li><b>コメンタリー</b>：各事物について「①それが何なのか」「②実社会のどのような文脈で見られるか」を特定したうえで、「③この展示に含めた理由」と「④IAプロンプトとのつながり」を説明する。</li>
+      <li><b>適切な引用と参考文献。</b></li>
+      <li><b>語数（字数）の上限</b>：3事物のコメンタリー<b>合計</b>で <b>950語（日本語は1900字）</b>。超過分は採点されない。</li>
+      <li><b>事物の数</b>：3つで<b>最高10点</b>。2つだと<b>最高6点</b>、1つだと<b>最高3点</b>。</li>
+      <li>展示のために特別に制作した物は不可（既存の物を使う）。事物の理由が<b>大幅に重複</b>しないこと。</li>
+    </ul>
+  </details>
+
+  <!-- 1. Prompt -->
+  <section class="card">
+    <h2><span class="num">1</span>IAプロンプトの選択</h2>
+    <p class="hint">IBが指定する35のIAプロンプトから1つを選びます。3つの事物すべてがこの1つのプロンプトに関連していなければなりません（和訳は公式手引きの文言）。</p>
+    <label class="field-label" for="promptSel">IAプロンプト</label>
+    <select id="promptSel"><option value="">— プロンプトを選択 —</option></select>
+    <div id="promptBox" class="prompt-box empty">プロンプトを選択すると、ここに公式和訳と英文が表示されます。</div>
+  </section>
+
+  <!-- 2/3/4. Objects -->
+  <section class="card">
+    <h2><span class="num">2</span>事物の登録と自己評価</h2>
+    <p class="hint">3つの事物をタブで切り替えて入力します。各事物は「具体的な実社会の文脈をもつ実在のモノ」である必要があります（一般的な概念やカテゴリは不可）。</p>
+
+    <div class="tabs" id="tabs">
+      <div class="tab active" data-obj="0">事物 1 <span class="dot" id="dot-0"></span></div>
+      <div class="tab" data-obj="1">事物 2 <span class="dot" id="dot-1"></span></div>
+      <div class="tab" data-obj="2">事物 3 <span class="dot" id="dot-2"></span></div>
+    </div>
+    <div id="panels"></div>
+  </section>
+
+  <!-- summary -->
+  <section class="card">
+    <h2><span class="num">★</span>全体バランスと到達レベルの目安</h2>
+    <p class="hint">ルーブリックの3観点（特定／つながり／正当化）を3つの事物で俯瞰します。いびつな形は弱い観点や事物を示します。</p>
+    <div class="grid2" style="align-items:center;">
+      <div style="max-width:430px; margin:0 auto;"><canvas id="radar" height="300"></canvas></div>
+      <div>
+        <div class="band" id="band">
+          <div class="score" id="bandScore">–<small>点 目安</small></div>
+          <div class="meta">
+            <div class="lvl" id="bandLvl">事物を評価すると表示されます</div>
+            <div class="kw" id="bandKw"></div>
+            <div class="note2">※ 自己評価に基づく到達レベルの<b>目安</b>です。実際の採点は教師・試験官による総合的印象評価で行われます。</div>
+          </div>
+        </div>
+        <div class="cap-warn" id="capWarn"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Outline -->
+  <section class="card">
+    <h2><span class="num">5</span>コメンタリー構成案の生成</h2>
+    <p class="hint">各事物の「コメンタリー・メモ（①〜③）」に書いた箇条書きを集約し、ルーブリックの3観点に沿った構成案にまとめます。メモが空の観点はガイドだけを表示します。</p>
+    <div class="btn-row" style="margin-bottom:6px;">
+      <button class="btn" id="genBtn">構成案を生成</button>
+      <div class="wordcfg">
+        <span>言語</span>
+        <span class="seg" id="langSeg">
+          <button data-lang="ja" class="on">日本語（字）</button>
+          <button data-lang="en">英語（語）</button>
+        </span>
+        <span>／ 1事物あたり目安</span>
+        <input type="number" id="wordTarget" value="633" min="50" step="5">
+        <span id="unitLabel">字</span>
+      </div>
+    </div>
+    <div class="note" id="wordNote"></div>
+
+    <div class="outline" id="outline"></div>
+
+    <div class="btn-row" style="margin-top:18px;">
+      <button class="btn" id="pdfBtn">PDFで保存（印刷）</button>
+      <button class="btn secondary" id="copyBtn">構成案をテキストでコピー</button>
+      <button class="btn secondary" id="resetBtn">全入力をリセット</button>
+      <span class="save-state" id="saveState">保存しました</span>
+    </div>
+    <div class="note">「PDFで保存」を押すと印刷ダイアログが開きます。送信先（プリンター）で <b>「PDFに保存」</b> を選ぶとPDFファイルとして書き出せます。</div>
+  </section>
+
+  <div id="printReport"></div>
+
+  <div class="foot">入力内容はこのブラウザ内（localStorage）にのみ保存されます。サーバー送信はありません。</div>
+</div>
+
+<script>
+// ---------- 35 official IA prompts (EN + official JA from the IB guide) ----------
+const PROMPTS = [
+  ["What counts as knowledge?", "どのようなものが知識と見なされるのか。"],
+  ["Are some types of knowledge more useful than others?", "知識の種類によって、有用度は異なるのだろうか。"],
+  ["What features of knowledge have an impact on its reliability?", "知識のどのような特徴が、その信頼性に影響するのか。"],
+  ["On what grounds might we doubt a claim?", "私たちはどのような理由で、主張を疑うようになるのか。"],
+  ["What counts as good evidence for a claim?", "どのようなものが主張の有効なエビデンスと見なされるのか。"],
+  ["How does the way that we organize or classify knowledge affect what we know?", "知識を整理したり分類したりする際に使われる方法は、私たちが知ることにどのように影響するか。"],
+  ["What are the implications of having, or not having, knowledge?", "知識をもつこと、あるいはもたないことはどのような意味をもつのか。"],
+  ["To what extent is certainty attainable?", "確実性というのは、どの程度達成可能なのか。"],
+  ["Are some types of knowledge less open to interpretation than others?", "他よりも解釈の余地が小さい知識の種類というのはあるのだろうか。"],
+  ["What challenges are raised by the dissemination and/or communication of knowledge?", "知識の伝播や伝達にはどのような課題が伴うのか。"],
+  ["Can new knowledge change established values or beliefs?", "新しい知識が、すでに確立した価値観や信念を変化させることはあるか。"],
+  ["Is bias inevitable in the production of knowledge?", "知識の生産においてバイアスを避けることは不可能なのか。"],
+  ["How can we know that current knowledge is an improvement upon past knowledge?", "現在の知識が過去の知識の改善であるということを、私たちはどのようにして知るのか。"],
+  ["Does some knowledge belong only to particular communities of knowers?", "知識によっては、特定の知る人のコミュニティーだけに帰属することがあるのだろうか。"],
+  ["What constraints are there on the pursuit of knowledge?", "知識の追究に際して、どのような制約が存在するか。"],
+  ["Should some knowledge not be sought on ethical grounds?", "知識によっては、倫理的な理由から追究されるべきでないものがあるのだろうか。"],
+  ["Why do we seek knowledge?", "私たちはなぜ知識を求めるのか。"],
+  ["Are some things unknowable?", "知ることのできないものは存在するのか。"],
+  ["What counts as a good justification for a claim?", "どのようなものが、主張を有効に正当化するものと見なされるのか。"],
+  ["What is the relationship between personal experience and knowledge?", "知識と個人的な経験の間にはどのような関係があるのか。"],
+  ["What is the relationship between knowledge and culture?", "知識と文化の間にはどのような関係があるのか。"],
+  ["What role do experts play in influencing our consumption or acquisition of knowledge?", "私たちの知識の消費や獲得に影響を及ぼすという点において、専門家はどのような役割を果たすか。"],
+  ["How important are material tools in the production or acquisition of knowledge?", "物質的なツールは、知識の生産や獲得においてどの程度重要か。"],
+  ["How might the context in which knowledge is presented influence whether it is accepted or rejected?", "知識が提示される文脈は、その知識が受け入れられるか否定されるかにどのように影響し得るか。"],
+  ["How can we distinguish between knowledge, belief and opinion?", "知識、信念、意見の3つを私たちはどのように区別できるか。"],
+  ["Does our knowledge depend on our interactions with other knowers?", "私たちの知識は、他の知る人とのかかわりに依存しているのか。"],
+  ["Does all knowledge impose ethical obligations on those who know it?", "すべての知識が、それを知る人に倫理的な義務を負わせるのか。"],
+  ["To what extent is objectivity possible in the production or acquisition of knowledge?", "知識の生産や獲得において客観性を達成することは、どの程度可能か。"],
+  ["Who owns knowledge?", "知識を所有するのは誰か。"],
+  ["What role does imagination play in producing knowledge about the world?", "世界についての知識を生産する際に、想像はどのような役割を果たすか。"],
+  ["How can we judge when evidence is adequate?", "エビデンスが適切かどうかを、私たちはどのように判断できるのか。"],
+  ["What makes a good explanation?", "どのようなものが、有効な説明と見なされるのか。"],
+  ["How is current knowledge shaped by its historical development?", "現在の知識は、知識の歴史的発展によってどのように形づくられているか。"],
+  ["In what ways do our values affect our acquisition of knowledge?", "私たちの価値観は、私たちの知識の獲得にどのように影響するか。"],
+  ["In what ways do values affect the production of knowledge?", "価値観は、知識の生産にどのように影響するか。"]
+];
+
+// ---------- 5-level band descriptors (from the official rubric) ----------
+const BANDS = [
+  { min:9, label:"非常に優れている（9〜10点）", kw:"説得力がある／明晰である／正確である" },
+  { min:7, label:"優れている（7〜8点）",       kw:"焦点が絞れている／関連性が高い／筋が通っている" },
+  { min:5, label:"十分である（5〜6点）",       kw:"妥当である／要求を満たしている／許容できる" },
+  { min:3, label:"基本的である（3〜4点）",     kw:"短絡的である／限定的である／議論が十分に発展していない" },
+  { min:1, label:"初歩的である（1〜2点）",     kw:"効果的でない／記述的である／筋が通っていない" }
+];
+
+const STORE_KEY = "tok_exhibition_tool_v2";
+const AXES = [
+  { key:"a", name:"特定（事物と実社会の文脈）", desc:"その事物が「何なのか」、いつ・どこで・誰にとっての具体的な実社会の文脈で見られるかを明確に特定できているか。", lo:"曖昧・一般的", hi:"明確に特定" },
+  { key:"b", name:"つながり（IAプロンプト）",   desc:"その事物が選んだIAプロンプトに「どう答えるか」を明確に説明できているか（単なる関連で止まっていないか）。", lo:"つながり薄い", hi:"明確なつながり" },
+  { key:"c", name:"正当化（理由とエビデンス）", desc:"展示に含めた理由を、適切なエビデンスで裏づけ、IAプロンプトに明確に言及して正当化できているか。", lo:"記述的・薄弱", hi:"エビデンスで正当化" }
+];
+
+let state = {
+  promptIdx: "", objects: [blankObj(), blankObj(), blankObj()],
+  lang: "ja", wordTarget: 633, activeTab: 0
+};
+function blankObj(){ return { name:"", img:"", context:"", a:5, b:5, c:5, memo:{a:"",b:"",c:""} }; }
+
+// コメンタリーの3観点（メモ欄の見出しとプレースホルダー）
+const SECTIONS = [
+  { key:"a", title:"① 特定（事物と実社会の文脈）",
+    ph:"・その物が何なのか（例：1965年製、祖父が使った実物の方位磁針）\n・いつ／どこで／誰にとっての物か、具体的な実社会の文脈" },
+  { key:"b", title:"② つながり（IAプロンプトへの言及）",
+    ph:"・この物は選んだ問いにどう答えるか（knowledge claim）\n・プロンプトの鍵語と、この物の特徴を結びつける" },
+  { key:"c", title:"③ 正当化（理由とエビデンス）",
+    ph:"・なぜ展示に含めたか＋裏づけるエビデンス\n・IAプロンプトへの明確な言及／展示全体への寄与" }
+];
+
+function load(){
+  // 既存の state.objects 参照を保ったまま中身だけ上書きする（参照を差し替えるとリスナーが孤立する）
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return;
+    const p = JSON.parse(raw);
+    if(typeof p.promptIdx !== 'undefined') state.promptIdx = p.promptIdx;
+    if(p.lang) state.lang = p.lang;
+    if(typeof p.wordTarget === 'number') state.wordTarget = p.wordTarget;
+    if(typeof p.activeTab === 'number') state.activeTab = p.activeTab;
+    if(Array.isArray(p.objects)){
+      for(let i=0;i<3;i++){
+        if(p.objects[i]) Object.assign(state.objects[i], p.objects[i]);
+        if(state.objects[i].c == null) state.objects[i].c = 5;
+        if(!state.objects[i].memo) state.objects[i].memo = {a:"",b:"",c:""};
+      }
+    }
+  } catch(e){}
+}
+let saveTimer=null;
+function save(){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch(e){ /* file:// やプライバシー設定で失敗しても無視 */ }
+  const el = document.getElementById('saveState');
+  if(!el) return;
+  el.textContent='保存しました'; el.classList.add('show');
+  clearTimeout(saveTimer); saveTimer = setTimeout(()=> el.classList.remove('show'), 1200);
+}
+
+// ---------- prompt dropdown ----------
+const sel = document.getElementById('promptSel');
+PROMPTS.forEach((p,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=(i+1)+". "+p[1]; sel.appendChild(o); });
+sel.addEventListener('change', ()=>{ state.promptIdx=sel.value; renderPrompt(); save(); });
+function renderPrompt(){
+  const box=document.getElementById('promptBox');
+  if(state.promptIdx===""||state.promptIdx==null){ box.className='prompt-box empty'; box.textContent='プロンプトを選択すると、ここに公式和訳と英文が表示されます。'; return; }
+  const p=PROMPTS[state.promptIdx];
+  box.className='prompt-box';
+  box.innerHTML='<div class="en">'+(Number(state.promptIdx)+1)+'. '+esc(p[1])+'</div><div class="ja">'+esc(p[0])+'</div>';
+}
+
+// ---------- object panels ----------
+// 保存データはパネル生成より前に読み込む（リスナーが捕捉する state.objects 参照を確定させるため）
+load();
+const panelsEl = document.getElementById('panels');
+for(let i=0;i<3;i++){ panelsEl.appendChild(buildPanel(i)); }
+
+function buildPanel(i){
+  const div=document.createElement('div');
+  div.className='obj-panel'+(i===0?' active':''); div.dataset.obj=i;
+
+  // 観点ごとに「自己評価スライダー」と「メモ」を横並びにする（A=①, B=②, C=③ が対応）
+  const evalRows = AXES.map((ax,k)=>{
+    const sc = SECTIONS[k];
+    return `
+    <div class="eval-row">
+      <div class="eval-headline">${sc.title}</div>
+      <div class="eval-cols">
+        <div class="eval-slider">
+          <div class="slider-head"><span class="name">自己評価（1〜10）</span><span class="val" data-val="${ax.key}">5</span></div>
+          <p class="slider-desc">${ax.desc}</p>
+          <input type="range" min="1" max="10" value="5" data-slider="${ax.key}">
+          <div class="scale-marks"><span>1 ${ax.lo}</span><span>10 ${ax.hi}</span></div>
+        </div>
+        <div class="eval-memo">
+          <label class="field-label">メモ（箇条書き・改行＝1項目）</label>
+          <textarea data-memo="${sc.key}" placeholder="${sc.ph}"></textarea>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const bars = AXES.map(ax=>`
+    <div class="bar-block">
+      <div class="bar-label"><b>${ax.name.split('（')[0]}</b><span data-barval="${ax.key}">5 / 10</span></div>
+      <div class="bar-track"><div class="bar-fill" data-bar="${ax.key}"></div></div>
+    </div>`).join('');
+
+  div.innerHTML = `
+    <div class="grid2">
+      <div>
+        <div class="field">
+          <label class="field-label">事物の名前 <span class="field-sub">具体的なモノ</span></label>
+          <input type="text" data-f="name" placeholder="例：祖父が遺した1965年製の方位磁針">
+        </div>
+        <div class="field">
+          <label class="field-label">画像 <span class="field-sub">出典の明記が必要</span></label>
+          <div class="img-drop" data-drop><div class="ph"><div class="ph-icon">＋</div><div class="ph-text">クリックで画像を選択</div></div></div>
+          <div class="img-actions">
+            <button class="link-btn" data-imgbtn>画像を選択</button>
+            <button class="link-btn danger" data-imgclear style="display:none">削除</button>
+          </div>
+          <input type="file" accept="image/*" data-file style="display:none">
+        </div>
+      </div>
+      <div>
+        <div class="field">
+          <label class="field-label">個人的な文脈 <span class="field-sub">なぜこれを選んだか・どんな実社会の文脈か</span></label>
+          <textarea data-f="context" placeholder="この事物がいつ・どこで・誰にとってのモノか、自分の知識経験とどう結びつくかを具体的に。"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="eval-section">
+      <div class="memo-title">観点ごとの自己評価とメモ（①〜③）</div>
+      <p class="memo-sub">各観点について、<b>左で自己評価（スライダー）</b>、<b>右に要点を箇条書きでメモ</b>します。メモは「構成案を生成」とPDFに反映されます。各欄のグレー文字はガイドです。</p>
+      ${evalRows}
+    </div>
+
+    <div class="viz-wrap">
+      <div class="bars">
+        ${bars}
+        <div class="bar-block">
+          <div class="bar-label"><b>総合</b><span data-barval="t">5.0 / 10</span></div>
+          <div class="bar-track"><div class="bar-fill" data-bar="t"></div></div>
+        </div>
+      </div>
+      <div class="suggest" data-suggest></div>
+    </div>
+  `;
+
+  const o=state.objects[i];
+  const nameI=div.querySelector('[data-f=name]'); const ctxI=div.querySelector('[data-f=context]');
+  nameI.value=o.name; ctxI.value=o.context;
+  nameI.addEventListener('input', ()=>{ o.name=nameI.value; updateTabDot(i); updateSummary(); save(); });
+  ctxI.addEventListener('input', ()=>{ o.context=ctxI.value; updateTabDot(i); updateFeedback(i); save(); });
+
+  AXES.forEach(ax=>{
+    const s=div.querySelector('[data-slider='+ax.key+']'); s.value=o[ax.key];
+    div.querySelector('[data-val='+ax.key+']').textContent=o[ax.key]; // 読み込んだ値をラベルにも反映
+    s.addEventListener('input', ()=>{ state.objects[i][ax.key]=+s.value; div.querySelector('[data-val='+ax.key+']').textContent=s.value; updateFeedback(i); save(); });
+  });
+
+  SECTIONS.forEach(sc=>{
+    const ta=div.querySelector('[data-memo='+sc.key+']');
+    ta.value=(o.memo && o.memo[sc.key])||"";
+    ta.addEventListener('input', ()=>{
+      if(!state.objects[i].memo) state.objects[i].memo={a:"",b:"",c:""};
+      state.objects[i].memo[sc.key]=ta.value; save();
+    });
+  });
+
+  const drop=div.querySelector('[data-drop]'); const file=div.querySelector('[data-file]');
+  const imgBtn=div.querySelector('[data-imgbtn]'); const imgClear=div.querySelector('[data-imgclear]');
+  drop.addEventListener('click', ()=>file.click());
+  imgBtn.addEventListener('click', ()=>file.click());
+  file.addEventListener('change', ()=>{ const f=file.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ o.img=r.result; renderImg(div,i); updateTabDot(i); updateSummary(); save(); }; r.readAsDataURL(f); });
+  imgClear.addEventListener('click', e=>{ e.stopPropagation(); o.img=""; file.value=""; renderImg(div,i); updateTabDot(i); updateSummary(); save(); });
+
+  return div;
+}
+
+function renderImg(div,i){
+  const o=state.objects[i]; const drop=div.querySelector('[data-drop]'); const clr=div.querySelector('[data-imgclear]');
+  if(o.img){ drop.innerHTML='<img src="'+o.img+'" alt="">'; clr.style.display='inline'; }
+  else { drop.innerHTML='<div class="ph"><div class="ph-icon">＋</div><div class="ph-text">クリックで画像を選択</div></div>'; clr.style.display='none'; }
+}
+
+// ---------- tabs ----------
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    const idx=+t.dataset.obj; state.activeTab=idx;
+    document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', +x.dataset.obj===idx));
+    document.querySelectorAll('.obj-panel').forEach(p=>p.classList.toggle('active', +p.dataset.obj===idx));
+    save();
+  });
+});
+function updateTabDot(i){
+  const o=state.objects[i];
+  document.getElementById('dot-'+i).classList.toggle('filled', objFilled(o));
+}
+function objFilled(o){ return o.name.trim()!=="" || o.img!=="" || o.context.trim()!==""; }
+
+// ---------- feedback ----------
+function barColor(v){ if(v>=8) return '#4a7a5a'; if(v>=5) return '#8a8d3b'; return '#b06a4a'; }
+function updateFeedback(i){
+  const o=state.objects[i]; const panel=document.querySelector('.obj-panel[data-obj="'+i+'"]');
+  const t=(o.a+o.b+o.c)/3;
+  AXES.forEach(ax=> setBar(panel,ax.key,o[ax.key], o[ax.key]+' / 10'));
+  setBar(panel,'t',t, t.toFixed(1)+' / 10');
+
+  const sug=panel.querySelector('[data-suggest]'); const tips=[];
+  if(o.a<=4) tips.push('<b>特定が弱い:</b> 一般的な物・ネット画像になっていませんか。いつ・どこで・誰にとっての具体的な実社会の文脈をもつ実在の物にしてください。');
+  if(o.b<=4) tips.push('<b>つながりが薄い:</b> この事物が選んだIAプロンプトに「どう答えるか」を一文で言い切れますか。プロンプトの鍵語と結びつけてください。');
+  if(o.c<=4) tips.push('<b>正当化が弱い:</b> 展示に含めた理由を、具体的なエビデンスで裏づけ、IAプロンプトに明確に言及して述べてください。記述だけ・断定だけになっていませんか。');
+  if(o.b>4 && o.b<=6) tips.push('この事物が<b>知識の生産・獲得・共有</b>にどう影響するかを明記すると、つながりが強まります。');
+  if(o.context.trim().length<40) tips.push('<b>個人的な文脈が短い:</b> なぜこれを選んだのか、あなた自身の知識経験との結びつきを具体的に書き足してください。');
+
+  if(tips.length){ sug.className='suggest show'; sug.innerHTML='<div class="s-title">改善のヒント</div><ul>'+tips.map(x=>'<li>'+x+'</li>').join('')+'</ul>'; }
+  else if(o.a>=8 && o.b>=8 && o.c>=8){ sug.className='suggest good show'; sug.innerHTML='<div class="s-title">良好</div>3観点とも強い状態です。コメンタリーでこの根拠を明示的に言語化しましょう。'; }
+  else { sug.className='suggest'; sug.innerHTML=''; }
+
+  updateSummary();
+}
+function setBar(panel,key,v,label){
+  const fill=panel.querySelector('[data-bar='+key+']');
+  fill.style.width=(v/10*100)+'%'; fill.style.background=barColor(v);
+  panel.querySelector('[data-barval='+key+']').textContent=label;
+}
+
+// ---------- radar + band ----------
+let radar;
+function initRadar(){
+  radar=new Chart(document.getElementById('radar'),{
+    type:'radar',
+    data:{ labels:AXES.map(a=>a.name.split('（')[0]),
+      datasets:[0,1,2].map(i=>({
+        label:'事物 '+(i+1), data:AXES.map(a=>state.objects[i][a.key]),
+        borderColor:['#4a5d52','#8a6d3b','#3e5c6e'][i],
+        backgroundColor:['rgba(74,93,82,.14)','rgba(138,109,59,.12)','rgba(62,92,110,.12)'][i],
+        pointBackgroundColor:['#4a5d52','#8a6d3b','#3e5c6e'][i], borderWidth:2
+      })) },
+    options:{ scales:{ r:{ min:0,max:10, ticks:{stepSize:2,color:'#9a978f',backdropColor:'transparent'},
+        grid:{color:'#e3e0d8'}, angleLines:{color:'#e3e0d8'}, pointLabels:{color:'#3a3a3a',font:{size:12,weight:'600'}} } },
+      plugins:{ legend:{position:'bottom',labels:{color:'#3a3a3a',font:{size:12},usePointStyle:true}} }, maintainAspectRatio:true }
+  });
+}
+function updateSummary(){
+  if(radar){ radar.data.datasets.forEach((ds,i)=>{ ds.data=AXES.map(a=>state.objects[i][a.key]); }); radar.update(); }
+
+  const filledCount = state.objects.filter(objFilled).length;
+  // band based on average of axes across filled objects (or all if none flagged)
+  const considered = filledCount>0 ? state.objects.filter(objFilled) : state.objects;
+  let sum=0,n=0; considered.forEach(o=>{ sum+=o.a+o.b+o.c; n+=3; });
+  const avg = n? sum/n : 0;
+  const rounded = Math.max(1, Math.min(10, Math.round(avg)));
+  const band = BANDS.find(b=>rounded>=b.min) || BANDS[BANDS.length-1];
+
+  const scoreEl=document.getElementById('bandScore');
+  const lvlEl=document.getElementById('bandLvl'); const kwEl=document.getElementById('bandKw');
+  if(n===0){ scoreEl.innerHTML='–<small>点 目安</small>'; lvlEl.textContent='事物を評価すると表示されます'; kwEl.textContent=''; }
+  else {
+    scoreEl.innerHTML=rounded+'<small>/10 目安</small>';
+    lvlEl.textContent=band.label; kwEl.textContent='想定される特徴：'+band.kw;
+    scoreEl.style.color = rounded>=7? 'var(--ok)' : rounded>=5? 'var(--accent2)' : '#b06a4a';
+  }
+
+  // object-count cap warning
+  const cw=document.getElementById('capWarn');
+  if(filledCount>0 && filledCount<3){
+    const cap = filledCount===2? '6点':'3点';
+    cw.className='cap-warn show';
+    cw.innerHTML='⚠ 現在 <b>'+filledCount+'つ</b>の事物しか入力されていません。事物が'+filledCount+'つの場合、公式ルール上の<b>最高点は'+cap+'</b>です（3つで最高10点）。';
+  } else { cw.className='cap-warn'; cw.innerHTML=''; }
+}
+
+// ---------- word config ----------
+function applyLang(){
+  const ja = state.lang==='ja';
+  document.getElementById('unitLabel').textContent = ja?'字':'語';
+  document.querySelectorAll('#langSeg button').forEach(b=>b.classList.toggle('on', b.dataset.lang===state.lang));
+  const total = ja? '1900字':'950語';
+  const per = ja? 633:317;
+  // only auto-set default when switching keeps it sensible
+  const wt=document.getElementById('wordTarget');
+  wt.max = ja?1900:950;
+  document.getElementById('wordNote').innerHTML =
+    '公式上限：3事物のコメンタリー<b>合計</b>で <b>'+total+'</b>（'+(ja?'日本語':'英語')+'）。'
+    +'均等配分なら1事物あたり約 <b>'+per+(ja?'字':'語')+'</b> が目安です。引用・参考文献・事物内のテキストは字数に含まれません。';
+}
+document.querySelectorAll('#langSeg button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    state.lang=b.dataset.lang;
+    state.wordTarget = state.lang==='ja'?633:317;
+    document.getElementById('wordTarget').value=state.wordTarget;
+    applyLang(); save();
+  });
+});
+document.getElementById('wordTarget').addEventListener('input', e=>{ state.wordTarget=+e.target.value||0; save(); });
+
+// ---------- outline ----------
+document.getElementById('genBtn').addEventListener('click', generateOutline);
+function generateOutline(){
+  const out=document.getElementById('outline');
+  if(state.promptIdx===""||state.promptIdx==null){
+    out.className='outline show';
+    out.innerHTML='<div class="note" style="border-color:var(--warn-line);background:var(--warn-bg);color:var(--warn-ink)">先に「1. IAプロンプトの選択」でプロンプトを選んでください。</div>';
+    return;
+  }
+  const p=PROMPTS[state.promptIdx]; const unit=state.lang==='ja'?'字':'語'; const wt=state.wordTarget;
+  let html='';
+  state.objects.forEach((o,i)=>{
+    const name=o.name.trim()||'（事物名 未入力）';
+    const t=(o.a+o.b+o.c)/3;
+    const badge=t>=7?'<span class="badge">整合度 '+t.toFixed(1)+'</span>':'<span class="badge low">整合度 '+t.toFixed(1)+'・要強化</span>';
+
+    html+='<div class="ol-obj">'
+      +'<h3>事物 '+(i+1)+'：'+esc(name)+' '+badge+'</h3>'
+      +'<div class="ol-meta">プロンプト '+(Number(state.promptIdx)+1)+'：'+esc(p[0])+' ／ 目安 約'+wt+unit+'</div>'
+
+      +commentarySections(o,p).map(sectionToHtml).join('')
+      +'</div>';
+  });
+
+  const totalScore=state.objects.reduce((s,o)=>s+(o.a+o.b+o.c)/3,0);
+  html+='<div class="note">全体メモ：3事物の整合度合計 '+totalScore.toFixed(1)+'/30。'
+    +'展示は「3つの事物が一つのプロンプトに、それぞれ<b>異なる角度</b>から答えている」と読めると強くなります。'
+    +'事物を含めた理由が<b>大幅に重複</b>していないか確認してください（重複はルーブリック上の減点要因です）。</div>';
+
+  out.className='outline show'; out.innerHTML=html;
+  out.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+// 生徒のメモ（①②③）を箇条書き化し、ガイド・警告を添える（画面とPDFで共通）
+function commentarySections(o,p){
+  const m=o.memo||{a:"",b:"",c:""};
+  const toBullets=t=>String(t||'').split(/\n+/).map(x=>x.replace(/^[\s・\-*●•]+/,'').trim()).filter(Boolean);
+  const pj=esc((p&&(p[1]||p[0]))?(p[1]||p[0]):'選択したプロンプト');
+  return [
+    { title:'① 特定（事物と実社会の文脈）',
+      hint:'その物が何で、いつ・どこで・誰にとっての具体的な実社会の文脈かを特定（一般的なネット画像は不可）。',
+      warn:o.a<=5?'観点Aが低め（'+o.a+'）：文脈が一般的・曖昧になっていないか確認。':'',
+      memo:toBullets(m.a) },
+    { title:'② つながり（IAプロンプトへの言及）',
+      hint:'この物が「'+pj+'」にどう答えるかを knowledge claim として言い切る。鍵語：'+keywordHint(p?(p[1]||''):''),
+      warn:o.b<=5?'観点Bが低め（'+o.b+'）：単なる関連で止まっていないか。':'',
+      memo:toBullets(m.b) },
+    { title:'③ 正当化（理由とエビデンス）',
+      hint:'含めた理由を適切なエビデンスで裏づけ、IAプロンプトに明確に言及。展示全体への寄与も。',
+      warn:o.c<=5?'観点Cが低め（'+o.c+'）：記述的・断定的になっていないか。':'',
+      memo:toBullets(m.c) }
+  ];
+}
+function sectionToHtml(sec){
+  const items = sec.memo.length
+    ? sec.memo.map(x=>'<li>'+esc(x)+'</li>').join('')
+    : '<li class="empty">（メモ未入力 — 上の「コメンタリー・メモ」に箇条書きで記入）</li>';
+  let extra='<div class="ol-hint">ガイド：'+sec.hint+'</div>';
+  if(sec.warn) extra+='<div class="ol-warn">※ '+sec.warn+'</div>';
+  return '<div class="ol-para"><div class="ph">'+sec.title+'</div><ul>'+items+'</ul>'+extra+'</div>';
+}
+function keywordHint(ja){
+  // extract salient Japanese content words from the official prompt translation
+  const stop=['どのような','ものが','私たち','こと','もの','する','される','見なされる','のか','のだろうか','について','という','において','によって','どの','ように','影響','ための','では','ある','あるか','ありますか'];
+  let s=ja.replace(/[。、？「」]/g,' ');
+  stop.forEach(w=> s=s.split(w).join(' '));
+  const parts=s.split(/\s+/).filter(w=>w.length>=2);
+  return esc(parts.slice(0,4).join(' / ')||'主要語');
+}
+
+// ---------- PDF (print) ----------
+document.getElementById('pdfBtn').addEventListener('click', ()=>{
+  buildReport();
+  setTimeout(()=>window.print(), 80);
+});
+function buildReport(){
+  const rep=document.getElementById('printReport');
+  const dateStr=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'});
+  let html='<div class="pr-head"><h1>TOK Exhibition 構成案</h1>'
+    +'<div class="pr-sub">生成日：'+dateStr+' ／ 評価の基本の質問「この展示は、私たちを取り巻く世界にTOKがどのように顕在しているかを示すことに成功しているか。」</div></div>';
+
+  if(state.promptIdx!==""&&state.promptIdx!=null){
+    const p=PROMPTS[state.promptIdx];
+    html+='<div class="pr-prompt"><div class="ja">IAプロンプト '+(Number(state.promptIdx)+1)+'：'+esc(p[1])+'</div><div class="en">'+esc(p[0])+'</div></div>';
+  } else {
+    html+='<div class="pr-prompt"><div class="ja">IAプロンプト：未選択</div></div>';
+  }
+  html+='<div class="pr-meta">語数上限：3事物のコメンタリー合計で '+(state.lang==='ja'?'1900字（日本語）':'950語（英語）')+' ／ 1事物あたり目安 約'+state.wordTarget+(state.lang==='ja'?'字':'語')+'</div>';
+
+  // band + radar snapshot
+  const filled=state.objects.filter(objFilled);
+  const considered=filled.length?filled:state.objects;
+  let sum=0,n=0; considered.forEach(o=>{ sum+=o.a+o.b+o.c; n+=3; });
+  const rounded=n?Math.max(1,Math.min(10,Math.round(sum/n))):0;
+  const band=BANDS.find(b=>rounded>=b.min)||BANDS[BANDS.length-1];
+  if(n){
+    html+='<div class="pr-band">到達レベルの目安（自己評価）：<b>'+rounded+'/10 — '+band.label+'</b>（想定される特徴：'+band.kw+'）</div>';
+    if(filled.length&&filled.length<3) html+='<div class="pr-band" style="color:#8a5a17">※ 事物が'+filled.length+'つのため、公式ルール上の最高点は'+(filled.length===2?'6点':'3点')+'です。</div>';
+  }
+  try { if(radar) html+='<div class="pr-radar"><img src="'+radar.toBase64Image()+'" alt="radar"></div>'; } catch(e){}
+
+  // objects
+  const p=(state.promptIdx!==""&&state.promptIdx!=null)?PROMPTS[state.promptIdx]:["",""];
+  state.objects.forEach((o,i)=>{
+    const t=(o.a+o.b+o.c)/3;
+    const name=o.name.trim()||'（事物名 未入力）';
+    const imgHtml=o.img?'<img src="'+o.img+'" alt="">':'<div class="noimg">画像なし</div>';
+    const data=commentarySections(o,p);
+    html+='<div class="pr-obj"><h2>事物 '+(i+1)+'：'+esc(name)+'</h2>'
+      +'<div class="pr-score">特定A='+o.a+' ／ つながりB='+o.b+' ／ 正当化C='+o.c+' ／ 整合度='+t.toFixed(1)+'/10</div>'
+      +'<div class="pr-obj-grid"><div class="pr-img">'+imgHtml+'</div><div style="flex:1">'
+      +'<p class="pr-ctx"><span class="lbl">個人的な文脈：</span>'+esc(o.context.trim()||'（未記入）')+'</p>'
+      +data.map(d=>'<div class="pr-para"><div class="ph">'+d.title+'</div><ul>'
+          +(d.memo.length?d.memo.map(x=>'<li>'+esc(x)+'</li>').join(''):'<li style="color:#b06a4a">（メモ未入力）</li>')
+          +'</ul><div style="font-size:10px;color:#888">ガイド：'+d.hint+'</div>'
+          +(d.warn?'<div style="font-size:10px;color:#8a5a17">※ '+d.warn+'</div>':'')
+          +'</div>').join('')
+      +'</div></div></div>';
+  });
+
+  html+='<div class="pr-foot">本ツールは自己評価支援用です。実際の採点は教師・試験官による総合的印象評価で行われます。'
+    +'出典：IB『「知の理論」（TOK）指導の手引き』2022年第1回試験。</div>';
+  rep.innerHTML=html;
+}
+
+// ---------- copy / reset ----------
+document.getElementById('copyBtn').addEventListener('click', ()=>{
+  if(!document.getElementById('outline').classList.contains('show')) generateOutline();
+  navigator.clipboard.writeText(buildPlainText()).then(()=>{
+    const el=document.getElementById('saveState'); el.textContent='コピーしました'; el.classList.add('show');
+    setTimeout(()=>{ el.classList.remove('show'); },1500);
+  });
+});
+function buildPlainText(){
+  if(state.promptIdx===""||state.promptIdx==null) return 'プロンプト未選択';
+  const p=PROMPTS[state.promptIdx]; let s='TOK Exhibition 構成案\n';
+  s+='プロンプト '+(Number(state.promptIdx)+1)+'：'+p[0]+'\n（'+p[1]+'）\n';
+  s+='上限：合計 '+(state.lang==='ja'?'1900字':'950語')+'（3事物のコメンタリー合計）\n\n';
+  state.objects.forEach((o,i)=>{
+    const t=(o.a+o.b+o.c)/3;
+    s+='── 事物'+(i+1)+'：'+(o.name.trim()||'（未入力）')+' ──\n';
+    s+='特定A='+o.a+' / つながりB='+o.b+' / 正当化C='+o.c+' / 整合度='+t.toFixed(1)+'\n';
+    s+='個人的な文脈：'+(o.context.trim()||'（未記入）')+'\n';
+    commentarySections(o,p).forEach(sec=>{
+      s+=sec.title+'\n';
+      if(sec.memo.length) sec.memo.forEach(b=> s+='  ・'+b+'\n');
+      else s+='  （メモ未入力）\n';
+    });
+    s+='\n';
+  });
+  return s;
+}
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(!confirm('すべての入力をリセットします。よろしいですか？')) return;
+  localStorage.removeItem(STORE_KEY); location.reload();
+});
+
+// ---------- helpers ----------
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function trimText(s,n){ return s.length>n? s.slice(0,n)+'…':s; }
+
+// ---------- init ----------
+// load() はパネル生成前に実行済み
+sel.value=state.promptIdx; renderPrompt();
+document.getElementById('wordTarget').value=state.wordTarget; applyLang();
+for(let i=0;i<3;i++){ const panel=document.querySelector('.obj-panel[data-obj="'+i+'"]'); renderImg(panel,i); updateTabDot(i); }
+document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', +x.dataset.obj===state.activeTab));
+document.querySelectorAll('.obj-panel').forEach(pp=>pp.classList.toggle('active', +pp.dataset.obj===state.activeTab));
+initRadar();
+for(let i=0;i<3;i++) updateFeedback(i);
+updateSummary();
+</script>
+</body>
+</html>
